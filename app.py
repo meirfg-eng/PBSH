@@ -155,4 +155,185 @@ QUESTIONS = [
             "תוכנה המשמשת להגנה על המחשב או המכשיר הנייד שלך מפני וירוסים מזיקים.",
             "סוג של מטבע קריפטוגרפי.",
         ],
-        "correct":
+        "correct": 0,
+    },
+    {
+        "id": 10,
+        "title": "אילו מהמשפטים מתאר בצורה הטובה ביותר כיצד פושעים מתחילים בהתקפות של תוכנות כופר?",
+        "options": [
+            "שליחת אימייל הונאה עם קישורים או קבצים מצורפים המסכנים את הנתונים והרשת שלך.",
+            "כניסה לשרתי הארגון דרך נקודות תורפה והתקנת תוכנות זדוניות.",
+            "שימוש באתרי אינטרנט נגועים שמורידים אוטומטית תוכנה זדונית למחשב או למכשיר הנייד שלך.",
+            "כל התשובות נכונות",
+        ],
+        "correct": 3,
+    },
+]
+
+# אתחול מצב באפליקציה
+if "step" not in st.session_state:
+  st.session_state.step = 0
+if "user_data" not in st.session_state:
+  st.session_state.user_data = {}
+if "answers" not in st.session_state:
+  st.session_state.answers = {}
+
+st.markdown(
+    "<h1 style='text-align: center;'>🔒 מבחן בקיאות - אבטחת מידע</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown("---")
+
+# שלב 0: קליטת פרטים אישיים
+if st.session_state.step == 0:
+  st.subheader("נא להזין את פרטיך האישיים לפני תחילת המבחן:")
+
+  with st.form("user_form"):
+    first_name_he = st.text_input("שם פרטי (עברית)")
+    last_name_he = st.text_input("שם משפחה (עברית)")
+    first_name_en = st.text_input("שם פרטי (אנגלית)")
+    last_name_en = st.text_input("שם משפחה (אנגלית)")
+
+    submitted = st.form_submit_button("התחל מבחן 🚀")
+    if submitted:
+      if (
+          not first_name_he
+          or not last_name_he
+          or not first_name_en
+          or not last_name_en
+      ):
+        st.error("נא למלא את כל שדות החובה!")
+      else:
+        st.session_state.user_data = {
+            "first_name_he": first_name_he,
+            "last_name_he": last_name_he,
+            "first_name_en": first_name_en,
+            "last_name_en": last_name_en,
+        }
+        st.session_state.step = 1
+        st.rerun()
+
+# שלבי השאלות (1 עד 10)
+elif 1 <= st.session_state.step <= len(QUESTIONS):
+  q_index = st.session_state.step - 1
+  q = QUESTIONS[q_index]
+
+  st.markdown(
+      f"<h3 style='text-align: center; color: #2980b9;'>שאלה {q['id']} מתוך"
+      f" {len(QUESTIONS)}</h3>",
+      unsafe_allow_html=True,
+  )
+  st.markdown(f"#### {q['title']}")
+
+  current_answer = st.session_state.answers.get(q_index, None)
+  selected_option = st.radio(
+      "בחר את התשובה הנכונה:",
+      options=range(len(q["options"])),
+      format_func=lambda x: q["options"][x],
+      index=current_answer if current_answer is not None else 0,
+      key=f"q_{q_index}",
+  )
+
+  st.session_state.answers[q_index] = selected_option
+
+  col1, col2 = st.columns(2)
+  with col1:
+    if st.session_state.step > 1:
+      if st.button("⬅ שאלה קודמת"):
+        st.session_state.step -= 1
+        st.rerun()
+
+  with col2:
+    if st.session_state.step < len(QUESTIONS):
+      if st.button("שאלה הבאה ➡️"):
+        st.session_state.step += 1
+        st.rerun()
+    else:
+      if st.button("סיים והגש מבחן ✅"):
+        st.session_state.step = 11
+        st.rerun()
+
+# שלב 11: סיכום, ציון והפקת PDF
+elif st.session_state.step == 11:
+  st.markdown(
+      "<h2 style='text-align: center;'>🎉 סיימת את המבחן בהצלחה!</h2>",
+      unsafe_allow_html=True,
+  )
+
+  score = 0
+  for idx, q in enumerate(QUESTIONS):
+    if st.session_state.answers.get(idx) == q["correct"]:
+      score += 10
+
+  ud = st.session_state.user_data
+  st.success(f"הציון הסופי שלך הוא: **{score} / 100**")
+  st.write(
+      f"**שם העובד:** {ud['first_name_he']} {ud['last_name_he']} ("
+      f"{ud['first_name_en']} {ud['last_name_en']})"
+  )
+
+
+  def create_pdf():
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    p.setFont("Helvetica-Bold", 16)
+    p.drawCentredString(width / 2, height - 50, "Security Test Results - PBSH")
+
+    p.setFont("Helvetica", 12)
+    p.drawString(
+        50,
+        height - 100,
+        f"Name (HE): {ud['first_name_he']} {ud['last_name_he']}",
+    )
+    p.drawString(
+        50,
+        height - 120,
+        f"Name (EN): {ud['first_name_en']} {ud['last_name_en']}",
+    )
+    p.drawString(
+        50, height - 140, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
+    p.drawString(50, height - 160, f"Target Email: mohpbsh@gmail.com")
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, height - 200, f"Final Score: {score} / 100")
+
+    p.setFont("Helvetica", 10)
+    y = height - 240
+    for idx, q in enumerate(QUESTIONS):
+      if y < 50:
+        p.showPage()
+        y = height - 50
+      ans_idx = st.session_state.answers.get(idx)
+      is_correct = "CORRECT" if ans_idx == q["correct"] else "INCORRECT"
+      p.drawString(
+          50,
+          y,
+          f"Q{q['id']}: {q['title'][:50]}... [{is_correct}]",
+      )
+      y -= 20
+
+    p.save()
+    buffer.seek(0)
+    return buffer
+
+
+  pdf_data = create_pdf()
+
+  st.download_button(
+      label="📄 הורד דוח תוצאות כקובץ PDF",
+      data=pdf_data,
+      file_name=(
+          f"security_test_{ud['first_name_en']}_{ud['last_name_en']}.pdf"
+      ),
+      mime="application/pdf",
+  )
+
+  st.markdown("---")
+  if st.button("🔄 התחל מבחן חדש לעובד הבא"):
+    st.session_state.step = 0
+    st.session_state.answers = {}
+    st.session_state.user_data = {}
+    st.rerun()
