@@ -1,32 +1,56 @@
 from datetime import datetime
 import io
-import smtplib
-from email import encoders
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 import streamlit as st
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 # הגדרת עיצוב עמוד
 st.set_page_config(
-    page_title="מבחן בקיאות באבטחת מידע", page_icon="🔒", layout="centered"
+    page_title="מבחן בקיאות - אבטחת מידע", page_icon="🔒", layout="centered"
 )
 
-# הזרקת עיצוב CSS ליישור לימין מלא ולמראה מותאם לטאבלט
+# הזרקת עיצוב CSS מתקדם לפונטים יפים (Rubik/Heebo), יישור לימין ומראה יוקרתי
 st.markdown(
     """
     <style>
-    body, html, [class*="css"] {
+    @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Heebo', sans-serif;
         direction: rtl;
         text-align: right;
+        background-color: #f8f9fa;
     }
+    
     .stRadio label {
+        font-size: 1.1rem;
+        font-weight: 400;
+        color: #2c3e50;
+        direction: rtl;
+        text-align: right;
+        padding: 5px 0;
+    }
+    
+    .stTextInput label {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #2c3e50;
         direction: rtl;
         text-align: right;
     }
-    .stTextInput label {
-        direction: rtl;
-        text-align: right;
+
+    h1, h2, h3 {
+        color: #1e3d59;
+        font-weight: 700;
+    }
+
+    /* עיצוב כפתורים */
+    .stButton>button {
+        border-radius: 8px;
+        font-family: 'Heebo', sans-serif;
+        font-weight: 500;
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
     }
     </style>
 """,
@@ -198,184 +222,4 @@ QUESTIONS = [
                 "גניבת ציוד מחשבים שהפושעים לוקחים, ומחזירים רק כאשר תשלם להם."
             ),
             (
-                "תוכנה המשמשת להגנה על המחשב או המכשיר הנייד שלך מפני וירוסים"
-                " מזיקים."
-            ),
-            "סוג של מטבע קריפטוגרפי.",
-        ],
-        "correct": 0,
-    },
-    {
-        "id": 10,
-        "title": (
-            "אילו מהמשפטים מתאר בצורה הטובה ביותר כיצד פושעים מתחילים"
-            " בהתקפות של תוכנות כופר?"
-        ),
-        "options": [
-            (
-                "שליחת אימייל הונאה עם קישורים או קבצים מצורפים המסכנים את"
-                " הנתונים והרשת שלך."
-            ),
-            (
-                "כניסה לשרתי הארגון דרך נקודות תורפה והתקנת תוכנות זדוניות."
-            ),
-            (
-                "שימוש באתרי אינטרנט נגועים שמורידים אוטומטית תוכנה זדונית למחשב"
-                " או למכשיר הנייד שלך."
-            ),
-            "כל התשובות נכונות",
-        ],
-        "correct": 3,
-    },
-]
-
-# אתחול מצב באפליקציה
-if "step" not in st.session_state:
-  st.session_state.step = 0
-if "user_data" not in st.session_state:
-  st.session_state.user_data = {}
-if "answers" not in st.session_state:
-  st.session_state.answers = {}
-
-st.title("🔒 מבחן בקיאות - אבטחת מידע")
-st.markdown("---")
-
-# שלב 0: קליטת פרטים אישיים
-if st.session_state.step == 0:
-  st.subheader("נא להזין את פרטיך האישיים לפני תחילת המבחן:")
-
-  with st.form("user_form"):
-    first_name_he = st.text_input("שם פרטי (עברית)")
-    last_name_he = st.text_input("שם משפחה (עברית)")
-    first_name_en = st.text_input("שם פרטי (אנגלית)")
-    last_name_en = st.text_input("שם משפחה (אנגלית)")
-
-    submitted = st.form_submit_button("התחל מבחן 🚀")
-    if submitted:
-      if (
-          not first_name_he
-          or not last_name_he
-          or not first_name_en
-          or not last_name_en
-      ):
-        st.error("נא למלא את כל שדות החובה!")
-      else:
-        st.session_state.user_data = {
-            "first_name_he": first_name_he,
-            "last_name_he": last_name_he,
-            "first_name_en": first_name_en,
-            "last_name_en": last_name_en,
-        }
-        st.session_state.step = 1
-        st.rerun()
-
-# שלבי השאלות (1 עד 10)
-elif 1 <= st.session_state.step <= len(QUESTIONS):
-  q_index = st.session_state.step - 1
-  q = QUESTIONS[q_index]
-
-  st.markdown(f"### שאלה {q['id']} מתוך {len(QUESTIONS)}")
-  st.write(f"**{q['title']}**")
-
-  current_answer = st.session_state.answers.get(q_index, None)
-  selected_option = st.radio(
-      "בחר את התשובה הנכונה:",
-      options=range(len(q["options"])),
-      format_func=lambda x: q["options"][x],
-      index=current_answer if current_answer is not None else 0,
-      key=f"q_{q_index}",
-  )
-
-  st.session_state.answers[q_index] = selected_option
-
-  col1, col2 = st.columns(2)
-  with col1:
-    if st.session_state.step > 1:
-      if st.button("⬅️ שאלה קודמת"):
-        st.session_state.step -= 1
-        st.rerun()
-
-  with col2:
-    if st.session_state.step < len(QUESTIONS):
-      if st.button("שאלה הבאה ➡️"):
-        st.session_state.step += 1
-        st.rerun()
-    else:
-      if st.button("סיים והגש מבחן ✅"):
-        st.session_state.step = 11
-        st.rerun()
-
-# שלב 11: סיכום, ציון והפקת PDF
-elif st.session_state.step == 11:
-  st.subheader("🎉 סיימת את המבחן בהצלחה!")
-
-  # חישוב ציון
-  score = 0
-  for idx, q in enumerate(QUESTIONS):
-    if st.session_state.answers.get(idx) == q["correct"]:
-      score += 10
-
-  ud = st.session_state.user_data
-  st.success(f"הציון הסופי שלך הוא: **{score} / 100**")
-  st.write(
-      f"**שם העובד:** {ud['first_name_he']} {ud['last_name_he']} ("
-      f"{ud['first_name_en']} {ud['last_name_en']})"
-  )
-
-
-  # יצירת טקסט מסודר במקום PDF מורכב שנתקע עם עברית
-  def create_text_summary():
-    content = f"""
- תוצאות מבחן אבטחת מידע
- ----------------------------------
- שם מלא (עברית): {ud['first_name_he']} {ud['last_name_he']}
- שם מלא (אנגלית): {ud['first_name_en']} {ud['last_name_en']}
- תאריך ושעה: {datetime.now().strftime('%Y-%m-%d %H:%M')}
- ציון סופי: {score} / 100
- ----------------------------------
- פירוט תשובות העובד:
-"""
-    for idx, q in enumerate(QUESTIONS):
-      ans_idx = st.session_state.answers.get(idx)
-      ans_text = q["options"][ans_idx] if ans_idx is not None else "לא נענה"
-      is_correct = "נכון" if ans_idx == q["correct"] else "שגוי"
-      content += (
-          f"\nשאלה {q['id']}: {q['title']}\nתשובת העובד: {ans_text}"
-          f" [{is_correct}]\n"
-      )
-    return content
-
-
-  report_text = create_text_summary()
-  report_bytes = report_text.encode("utf-8")
-
-  st.download_button(
-      label="📄 הורד דוח תוצאות כקובץ טקסט למחשב/טאבלט",
-      data=report_bytes,
-      file_name=(
-          f"security_test_{ud['first_name_en']}_{ud['last_name_en']}.txt"
-      ),
-      mime="text/plain",
-  )
-
-  # שליחה אוטומטית למייל שלך mohpbsh@gmail.com
-  if "email_sent" not in st.session_state:
-    st.session_state.email_sent = False
-
-  if not st.session_state.email_sent:
-    try:
-      # הערה: כדי לשלוח דרך Gmail ישירות מהקוד ללא סיסמת אפליקציה מורכבת,
-      # נציג הודעה שהדוח מוכן ונשלח, או נגדיר שליחה בסיסית.
-      # כרגע נציג לחצן שליחה ישירה למייל שלך למניעת חסימות אבטחה של גוגל:
-      pass
-    except Exception as e:
-      pass
-
-  st.markdown("---")
-  if st.button("🔄 התחל מבחן חדש לעובד הבא"):
-    st.session_state.step = 0
-    st.session_state.answers = {}
-    st.session_state.user_data = {}
-    if "email_sent" in st.session_state:
-      del st.session_state.email_sent
-    st.rerun()
+                "תוכנה המשמשת להגנה על המחשב או המכשיר הנייד שלך מפני
