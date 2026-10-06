@@ -56,7 +56,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# הגדרת השאלות והתשובות הנכונות לפי המסמך
+# הגדרת השאלות והתשובות הנכונות לפי המסמך[cite: 1]
 QUESTIONS = [
     {
         "id": 1,
@@ -218,12 +218,16 @@ elif 1 <= st.session_state.step <= len(QUESTIONS):
   q_index = st.session_state.step - 1
   q = QUESTIONS[q_index]
 
+  # שתי הכותרות ממורכזות כעת באמצע המסך
   st.markdown(
       f"<h3 style='text-align: center; color: #2980b9;'>שאלה {q['id']} מתוך"
       f" {len(QUESTIONS)}</h3>",
       unsafe_allow_html=True,
   )
-  st.markdown(f"#### {q['title']}")
+  st.markdown(
+      f"<h4 style='text-align: center;'>{q['title']}</h4>",
+      unsafe_allow_html=True,
+  )
 
   current_answer = st.session_state.answers.get(q_index, None)
   selected_option = st.radio(
